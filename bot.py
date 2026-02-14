@@ -1,48 +1,54 @@
-import asyncio
 import os
-from dotenv import load_dotenv
+import asyncio
+import logging
+import sqlite3
+import google.generativeai as genai
 from aiogram import Bot, Dispatcher, types
-from aiogram.filters import CommandStart
-from openai import OpenAI
-from database import save_message, get_history, is_blocked, get_prompt, init_db
+from aiogram.filters import Command
+from dotenv import load_dotenv
 
+# Айнымалыларды жүктеу
 load_dotenv()
+API_KEY = os.getenv("GEMINI_API_KEY")
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+# Gemini баптау
+genai.configure(api_key=API_KEY)
+model = genai.GenerativeModel('gemini-1.5-flash')
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
-client = OpenAI(api_key=OPENAI_API_KEY)
 
-@dp.message(CommandStart())
+# Деректер қорынан промпт алу функциясы
+def get_system_prompt():
+    try:
+        conn = sqlite3.connect('database.db')
+        cursor = conn.cursor()
+        cursor.execute("SELECT prompt FROM settings LIMIT 1")
+        result = cursor.fetchone()
+        conn.close()
+        return result[0] if result else "Сен география пәнінен көмекшісің."
+    except:
+        return "Сен география пәнінен көмекшісің."
+
+@dp.message(Command("start"))
 async def start_handler(message: types.Message):
-    await message.answer("🤖 Жеке AI көмекші іске қосылды!")
+    await message.answer("Сәлем! Мен География пәнінен AI көмекшімін. Сұрағыңызды қойсаңыз болады.")
 
 @dp.message()
-async def ai_handler(message: types.Message):
-    user_id = message.from_user.id
-
-    if await is_blocked(user_id):
-        return
-
-    await save_message(user_id, "user", message.text)
-    history = await get_history(user_id)
-    system_prompt = await get_prompt()
-
-    messages = [{"role": "system", "content": system_prompt}] + history
-
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=messages
-    )
-
-    reply = response.choices[0].message.content
-    await save_message(user_id, "assistant", reply)
-    await message.answer(reply)
+async def chat_handler(message: types.Message):
+    system_prompt = get_system_prompt()
+    user_input = message.text
+    
+    try:
+        # Gemini-ге сұраныс жіберу
+        response = model.generate_content(f"{system_prompt}\n\nПайдаланушы сұрағы: {user_input}")
+        await message.answer(response.text)
+    except Exception as e:
+        logging.error(f"Қате: {e}")
+        await message.answer("Кешіріңіз, сұранысты өңдеу кезінде қате шықты.")
 
 async def main():
-    # Базаны осы жерде бір рет қана іске қосамыз
-    await init_db()
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
