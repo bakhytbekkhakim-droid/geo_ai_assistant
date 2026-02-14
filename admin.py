@@ -7,12 +7,13 @@ import aiosqlite, os
 import asyncio
 from contextlib import asynccontextmanager
 
+# 1. Lifespan функциясы базаны қауіпсіз іске қосады
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Сервер іске қосылғанда деректер қорын дайындайды
     await init_db()
     yield
 
+# 2. Мұнда ескі asyncio.run жолы өшірілді және lifespan қосылды
 app = FastAPI(lifespan=lifespan)
 templates = Jinja2Templates(directory="templates")
 security = HTTPBasic()
