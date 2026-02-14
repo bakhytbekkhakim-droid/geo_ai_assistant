@@ -14,8 +14,6 @@ bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 client = OpenAI(api_key=OPENAI_API_KEY)
 
-asyncio.run(init_db())
-
 @dp.message(CommandStart())
 async def start_handler(message: types.Message):
     await message.answer("🤖 Жеке AI көмекші іске қосылды!")
@@ -43,6 +41,8 @@ async def ai_handler(message: types.Message):
     await message.answer(reply)
 
 async def main():
+    # Базаны осы жерде бір рет қана іске қосамыз
+    await init_db()
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
