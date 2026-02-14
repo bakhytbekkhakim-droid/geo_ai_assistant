@@ -14,7 +14,7 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 
 # Gemini баптау
 genai.configure(api_key=API_KEY)
-model = genai.GenerativeModel('gemini-pro')
+model = genai.GenerativeModel('gemini-1.5-flash-latest')
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
