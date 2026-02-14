@@ -5,14 +5,15 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from database import set_prompt, init_db
 import aiosqlite, os
 import asyncio
-
 from contextlib import asynccontextmanager
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Сервер іске қосылғанда деректер қорын дайындайды
     await init_db()
     yield
+
 app = FastAPI(lifespan=lifespan)
-app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 security = HTTPBasic()
 
