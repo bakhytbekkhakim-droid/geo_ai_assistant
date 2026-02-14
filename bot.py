@@ -5,11 +5,10 @@ from aiogram import Bot, Dispatcher, types
 from dotenv import load_dotenv
 
 load_dotenv()
-# Render-дегі Environment Variables-ден алынады
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
-# Модель аты нақтыланған
-model = genai.GenerativeModel('gemini-1.5-flash-latest')
+# Ең көп таралған тұрақты модель
+model = genai.GenerativeModel('gemini-pro')
 
 bot = Bot(token=os.getenv("BOT_TOKEN"))
 dp = Dispatcher()
@@ -20,7 +19,7 @@ async def chat(message: types.Message):
         response = model.generate_content(message.text)
         await message.answer(response.text)
     except Exception as e:
-        await message.answer(f"1-нұсқа қатесі: {str(e)[:50]}")
+        await message.answer(f"3-нұсқа қатесі: {str(e)[:50]}")
 
 async def main():
     await dp.start_polling(bot)
