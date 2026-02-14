@@ -11,13 +11,7 @@ from contextlib import asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
     yield
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    await init_db()
-    yield
-
 app = FastAPI(lifespan=lifespan)
-
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 security = HTTPBasic()
