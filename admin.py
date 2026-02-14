@@ -6,7 +6,17 @@ from database import set_prompt, init_db
 import aiosqlite, os
 import asyncio
 
-asyncio.run(init_db())
+from contextlib import asynccontextmanager
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await init_db()
+    yield
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await init_db()
+    yield
+
+app = FastAPI(lifespan=lifespan)
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
