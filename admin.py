@@ -1,61 +1,55 @@
-from fastapi import FastAPI, Request, Depends, HTTPException, status, Form
+import os
+import sqlite3
+from fastapi import FastAPI, Request, Form, Depends, HTTPException
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import RedirectResponse
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
-from database import set_prompt, init_db
-import aiosqlite, os
-import asyncio
-from contextlib import asynccontextmanager
+from fastapi.staticfiles import StaticFiles
+from starlette.status import HTTP_303_SEE_OTHER
+from dotenv import load_dotenv
 
-# 1. Lifespan функциясы базаны қауіпсіз іске қосады
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    await init_db()
-    yield
+load_dotenv()
 
-# 2. Мұнда ескі asyncio.run жолы өшірілді және lifespan қосылды
-app = FastAPI(lifespan=lifespan)
+app = FastAPI()
+
+# Шаблондар мен логин мәліметтері
 templates = Jinja2Templates(directory="templates")
-security = HTTPBasic()
+ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "12345")
 
-ADMIN_USER = os.getenv("ADMIN_USER")
-ADMIN_PASS = os.getenv("ADMIN_PASS")
+# Мәліметтер қорын дайындау
+def init_db():
+    conn = sqlite3.connect('database.db')
+    cursor = conn.cursor()
+    cursor.execute('''CREATE TABLE IF NOT EXISTS settings (id INTEGER PRIMARY KEY, prompt TEXT)''')
+    # Егер кесте бос болса, бастапқы промптты қосу
+    cursor.execute("SELECT COUNT(*) FROM settings")
+    if cursor.fetchone()[0] == 0:
+        cursor.execute("INSERT INTO settings (prompt) VALUES (?)", ("Сен география пәнінен көмекшісің.",))
+    conn.commit()
+    conn.close()
 
-def auth(credentials: HTTPBasicCredentials = Depends(security)):
-    if credentials.username != ADMIN_USER or credentials.password != ADMIN_PASS:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Қате логин немесе пароль",
-            headers={"WWW-Authenticate": "Basic"},
-        )
-    return credentials.username
+init_db()
 
-@app.get("/")
-async def dashboard(request: Request, username: str = Depends(auth)):
-    async with aiosqlite.connect("chat_history.db") as db:
-        cursor = await db.execute("SELECT COUNT(DISTINCT user_id) FROM history")
-        users = await cursor.fetchone()
-        cursor = await db.execute("SELECT COUNT(*) FROM history")
-        messages = await cursor.fetchone()
+@app.get("/", response_class=HTMLResponse)
+async def index(request: Request):
+    # index.html файлын шаблондар папкасынан шақыру
+    conn = sqlite3.connect('database.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT prompt FROM settings LIMIT 1")
+    prompt = cursor.fetchone()[0]
+    conn.close()
+    return templates.TemplateResponse("index.html", {"request": request, "prompt": prompt})
 
-    return templates.TemplateResponse("index.html", {
-        "request": request,
-        "users": users[0],
-        "messages": messages[0]
-    })
+@app.post("/update_prompt")
+async def update_prompt(prompt: str = Form(...)):
+    conn = sqlite3.connect('database.db')
+    cursor = conn.cursor()
+    cursor.execute("UPDATE settings SET prompt = ? WHERE id = 1", (prompt,))
+    conn.commit()
+    conn.close()
+    return RedirectResponse(url="/", status_code=HTTP_303_SEE_OTHER)
 
-@app.get("/prompt")
-async def edit_prompt(request: Request, username: str = Depends(auth)):
-    async with aiosqlite.connect("chat_history.db") as db:
-        cursor = await db.execute("SELECT content FROM prompt WHERE id=1")
-        row = await cursor.fetchone()
-        current = row[0] if row else ""
-    return templates.TemplateResponse("prompt.html", {
-        "request": request,
-        "current": current
-    })
-
-@app.post("/prompt")
-async def update_prompt(request: Request, new_prompt: str = Form(...), username: str = Depends(auth)):
-    await set_prompt(new_prompt)
-    return RedirectResponse("/prompt", status_code=303)
+# Render-де жұмыс істеу үшін портты баптау
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=10000)
